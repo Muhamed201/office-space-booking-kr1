@@ -1,0 +1,37 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: office-booking-db
+    environment:
+      POSTGRES_DB: ${DB_NAME:-office_booking}
+      POSTGRES_USER: ${DB_USER:-office}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-office}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-office} -d ${DB_NAME:-office_booking}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Консольное приложение. Не поднимается вместе с `up` (профиль "app"),
+  # т.к. интерактивное меню в мультиплексе логов compose нечитаемо.
+  # Запуск: docker compose run --rm app
+  app:
+    build: .
+    image: office-booking-app
+    profiles: ["app"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/${DB_NAME:-office_booking}
+      DB_USER: ${DB_USER:-office}
+      DB_PASSWORD: ${DB_PASSWORD:-office}
+    stdin_open: true
+    tty: true
+
+volumes:
+  db-data:

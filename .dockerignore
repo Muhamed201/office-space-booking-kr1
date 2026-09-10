@@ -1,0 +1,11 @@
+.git
+.gitattributes
+.gitignore
+.idea
+*.iml
+target
+docs
+sql
+*.md
+.env
+.mvn/wrapper/maven-wrapper.jar
