@@ -57,38 +57,58 @@ office-space-booking/
 
 ## Запуск
 
-_Раздел довести до ума перед сдачей (это отдельный артефакт «инструкция по запуску»)._
+Требования: JDK 21 и Docker Desktop (для PostgreSQL). Maven ставить не нужно — есть `mvnw`.
 
-### Вариант A — Docker (нужен только Docker Desktop)
+### Вариант A — всё в Docker
 
 ```
 cp .env.example .env          # один раз
 docker compose up -d db       # поднять PostgreSQL
-docker compose run --rm app   # собрать и запустить консоль
+docker compose run --rm app   # собрать и запустить консольное приложение
 ```
+
+Файлы экспорта из контейнера появляются в папке `exports/` проекта.
 
 Остановить БД: `docker compose down` (данные сохраняются в томе `db-data`;
 полностью снести — `docker compose down -v`).
 
-### Вариант B — локально (JDK 21 + Maven + свой PostgreSQL)
+### Вариант B — приложение локально, БД в Docker
 
-- создать пустую БД, задать подключение в `src/main/resources/application.properties`
-  или переменными окружения `DB_URL` / `DB_USER` / `DB_PASSWORD`
-- миграции Flyway применяются при старте приложения (см. docs/07), вручную — `mvn flyway:migrate`
-- сборка: `mvn clean package` → запуск: `java -jar target/office-booking.jar`
+```
+cp .env.example .env
+docker compose up -d db
+./mvnw clean package
+java -jar target/office-booking.jar
+```
 
-> Для разработки удобнее всего: `docker compose up -d db` + запуск `Main` из IDE.
+Параметры подключения по умолчанию лежат в `src/main/resources/application.properties`
+(`localhost:5434`, БД `office_booking`, пользователь `office`). Их можно переопределить
+переменными окружения `DB_URL` / `DB_USER` / `DB_PASSWORD` — они важнее файла.
+Для разработки удобно поднять БД в Docker и запускать `Main` из IDE.
 
-> **Нужно в коде:** `DatabaseManager` (и конфиг Flyway) читают сначала переменные
-> окружения `DB_URL` / `DB_USER` / `DB_PASSWORD`, при их отсутствии —
-> `application.properties`. Без этого контейнер `app` не найдёт БД по хосту `db`.
+Схема и демо-данные создаются автоматически при старте приложения (Flyway,
+`src/main/resources/db/migration/`). Вручную: `./mvnw flyway:migrate`.
+
+Если нужен другой порт БД, поменяйте `DB_PORT` в `.env` и `db.url` в `application.properties`.
+
+Если консоль показывает русский текст «кракозябрами» (Windows), запускайте так:
+`java -Dstdout.encoding=UTF-8 -jar target/office-booking.jar`.
+
+### Тесты
+
+```
+./mvnw test
+```
+
+Тесты не требуют базы данных: валидация моделей, бизнес-правила `BookingService` (на подставных
+репозиториях и фиксированных часах), перевод ошибок БД в понятные исключения.
 
 ## Что сдаём (чек-лист защиты)
 
-- [ ] Исходный код Java-проекта
-- [ ] `pom.xml`
-- [ ] SQL-скрипт создания БД (Flyway-миграции `src/main/resources/db/migration/`)
-- [ ] ER-диаграмма (PNG — dbdiagram.io или реверс из DBeaver / pgAdmin)
-- [ ] Экспортированный Excel-файл
-- [ ] Инструкция по запуску
-- [ ] Рабочее консольное приложение
+- [x] Исходный код Java-проекта
+- [x] `pom.xml`
+- [x] SQL-скрипт создания БД (Flyway-миграции `src/main/resources/db/migration/`)
+- [ ] ER-диаграмма (PNG — реверс из DataGrip / IntelliJ IDEA: правой кнопкой по схеме `public` → Diagrams → Show Visualization → Export)
+- [x] Экспортированный Excel-файл (`exports/`)
+- [x] Инструкция по запуску
+- [x] Рабочее консольное приложение
