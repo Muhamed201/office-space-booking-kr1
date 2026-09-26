@@ -30,6 +30,8 @@ services:
       DB_URL: jdbc:postgresql://db:5432/${DB_NAME:-office_booking}
       DB_USER: ${DB_USER:-office}
       DB_PASSWORD: ${DB_PASSWORD:-office}
+    volumes:
+      - ./exports:/app/exports
     stdin_open: true
     tty: true
 
