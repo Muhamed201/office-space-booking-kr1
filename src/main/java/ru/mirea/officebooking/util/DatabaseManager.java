@@ -19,10 +19,10 @@ public class DatabaseManager {
 
     public DatabaseManager() {
         Properties props = new Properties();
-        try (InputStream inputStream = DatabaseManager.class.getResourceAsStream("/application.properties")) {
+        try (InputStream inputStream = DatabaseManager.class.getResourceAsStream("/database.properties")) {
             if (inputStream == null) {
                 throw new DatabaseException("Не удалось инициализировать данные БД",
-                        new FileNotFoundException("Resource /application.properties not found in classpath"));
+                        new FileNotFoundException("Resource /database.properties not found in classpath"));
             }
             props.load(inputStream);
             url = requireConfigured(resolve("DB_URL", "db.url", props), "DB_URL / db.url");
@@ -31,6 +31,13 @@ public class DatabaseManager {
         } catch (IOException e) {
             throw new DatabaseException("Не удалось прочитать данные для базы данных", e);
         }
+        DriverManager.setLoginTimeout(LOGIN_TIMEOUT_SECONDS);
+    }
+
+    public DatabaseManager(String url, String user, String password) {
+        this.url = requireConfigured(url, "db.url");
+        this.user = requireConfigured(user, "db.user");
+        this.password = requireConfigured(password, "db.password");
         DriverManager.setLoginTimeout(LOGIN_TIMEOUT_SECONDS);
     }
 
