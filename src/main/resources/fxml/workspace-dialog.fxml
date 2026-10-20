@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="ru.mirea.officebooking.fx.controller.WorkspaceDialogController"
+      styleClass="form" spacing="12" prefWidth="440">
+    <GridPane hgap="10" vgap="10">
+        <columnConstraints>
+            <ColumnConstraints minWidth="110"/>
+            <ColumnConstraints hgrow="ALWAYS"/>
+        </columnConstraints>
+
+        <Label text="Тип *" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
+        <ComboBox fx:id="typeCombo" maxWidth="Infinity" GridPane.rowIndex="0" GridPane.columnIndex="1"/>
+
+        <Label text="Код *" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
+        <TextField fx:id="codeField" promptText="Например, A-18" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+
+        <Label text="Этаж *" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
+        <TextField fx:id="floorField" promptText="От -2 до 50" GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+
+        <Label text="Вместимость" GridPane.rowIndex="3" GridPane.columnIndex="0"/>
+        <TextField fx:id="capacityField" promptText="Только для переговорной" GridPane.rowIndex="3" GridPane.columnIndex="1"/>
+
+        <CheckBox fx:id="monitorCheck" text="Есть монитор" GridPane.rowIndex="4" GridPane.columnIndex="1"/>
+    </GridPane>
+    <Label fx:id="errorLabel" styleClass="error" wrapText="true" prefWidth="400"/>
+</VBox>
