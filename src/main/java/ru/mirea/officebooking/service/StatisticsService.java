@@ -7,6 +7,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import java.time.LocalDate;
+import ru.mirea.officebooking.dto.StatisticsReport;
+import ru.mirea.officebooking.exception.ValidationException;
 import ru.mirea.officebooking.model.Booking;
 import ru.mirea.officebooking.model.BookingStatus;
 import ru.mirea.officebooking.model.Employee;
@@ -14,6 +17,7 @@ import ru.mirea.officebooking.model.Validation;
 import ru.mirea.officebooking.model.Workspace;
 import ru.mirea.officebooking.model.WorkspaceStatus;
 import ru.mirea.officebooking.model.WorkspaceType;
+import ru.mirea.officebooking.repository.BookingQueryRepository;
 import ru.mirea.officebooking.repository.BookingRepository;
 import ru.mirea.officebooking.repository.EmployeeRepository;
 import ru.mirea.officebooking.repository.WorkspaceRepository;
@@ -23,15 +27,43 @@ public class StatisticsService {
     public record NamedCount(String label, long count) {
     }
 
+    private static final int TOP_SIZE = 5;
+
     private final EmployeeRepository employeeRepository;
     private final WorkspaceRepository workspaceRepository;
     private final BookingRepository bookingRepository;
+    private final BookingQueryRepository queryRepository;
 
     public StatisticsService(EmployeeRepository employeeRepository, WorkspaceRepository workspaceRepository,
-                             BookingRepository bookingRepository) {
+                             BookingRepository bookingRepository, BookingQueryRepository queryRepository) {
         this.employeeRepository = employeeRepository;
         this.workspaceRepository = workspaceRepository;
         this.bookingRepository = bookingRepository;
+        this.queryRepository = queryRepository;
+    }
+
+    public StatisticsReport buildReport(LocalDate from, LocalDate to) {
+        if (from != null && to != null && from.isAfter(to)) {
+            throw new ValidationException("Дата «с» не может быть позже даты «по»");
+        }
+        Map<BookingStatus, Long> byStatus = queryRepository.countByStatus();
+        long finished = byStatus.get(BookingStatus.COMPLETED) + byStatus.get(BookingStatus.NO_SHOW);
+        double noShowPercent = finished == 0 ? 0.0 : byStatus.get(BookingStatus.NO_SHOW) * 100.0 / finished;
+        BookingQueryRepository.DurationStats durations = queryRepository.durationStats();
+        List<Employee> employees = employeeRepository.findAll();
+        return new StatisticsReport(
+                queryRepository.countAll(),
+                queryRepository.countInPeriod(from, to),
+                byStatus,
+                queryRepository.countByWorkspaceType(),
+                durations.avgHours(),
+                durations.minHours(),
+                durations.maxHours(),
+                noShowPercent,
+                queryRepository.topWorkspaces(TOP_SIZE),
+                queryRepository.topEmployees(TOP_SIZE),
+                employees.size(),
+                employees.stream().filter(Employee::isBlocked).count());
     }
 
     public long totalEmployees() {

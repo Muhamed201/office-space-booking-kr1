@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import ru.mirea.officebooking.exception.AccessDeniedException;
 import ru.mirea.officebooking.exception.BookingConflictException;
 import ru.mirea.officebooking.exception.EntityNotFoundException;
 import ru.mirea.officebooking.exception.InvalidStatusTransitionException;
@@ -33,6 +34,7 @@ BookingService {
     private final EmployeeRepository employeeRepository;
     private final WorkspaceRepository workspaceRepository;
     private final Clock clock;
+    private final AccessPolicy accessPolicy;
 
     public BookingService(BookingRepository bookingRepository, EmployeeRepository employeeRepository,
                           WorkspaceRepository workspaceRepository) {
@@ -45,6 +47,40 @@ BookingService {
         this.employeeRepository = employeeRepository;
         this.workspaceRepository = workspaceRepository;
         this.clock = clock;
+        this.accessPolicy = new AccessPolicy(employeeRepository);
+    }
+
+    public Booking createAs(long actorId, long employeeId, long workspaceId, LocalDateTime start, LocalDateTime end,
+                            Integer attendees, String purpose) {
+        Employee actor = accessPolicy.requireActor(actorId);
+        if (actor.getId() != employeeId && !AccessPolicy.isManager(actor)) {
+            throw new AccessDeniedException(
+                    "Недостаточно прав: сотрудник может бронировать только на себя, на других — офис-менеджер");
+        }
+        return create(employeeId, workspaceId, start, end, attendees, purpose);
+    }
+
+    public Booking updateTimeAs(long actorId, long bookingId, LocalDateTime newStart, LocalDateTime newEnd,
+                                Integer attendees, String purpose) {
+        Booking existing = findById(bookingId);
+        accessPolicy.requireOwnerOrManager(actorId, existing.getEmployeeId(), "изменить");
+        return updateTime(bookingId, newStart, newEnd, attendees, purpose);
+    }
+
+    public Booking changeStatusAs(long actorId, long bookingId, BookingStatus target) {
+        Validation.requireNotNull(target, "Новый статус");
+        Booking existing = findById(bookingId);
+        if (target == BookingStatus.CANCELLED) {
+            accessPolicy.requireOwnerOrManager(actorId, existing.getEmployeeId(), "отменить");
+        } else {
+            accessPolicy.requireManager(actorId, "отмечать завершение и неявку");
+        }
+        return changeStatus(bookingId, target);
+    }
+
+    public void deleteAs(long actorId, long bookingId) {
+        accessPolicy.requireManager(actorId, "удалять брони");
+        delete(bookingId);
     }
 
     public List<Booking> findAll() {

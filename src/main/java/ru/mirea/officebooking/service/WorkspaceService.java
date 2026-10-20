@@ -13,6 +13,7 @@ import ru.mirea.officebooking.model.Workspace;
 import ru.mirea.officebooking.model.WorkspaceStatus;
 import ru.mirea.officebooking.model.WorkspaceType;
 import ru.mirea.officebooking.repository.BookingRepository;
+import ru.mirea.officebooking.repository.EmployeeRepository;
 import ru.mirea.officebooking.repository.WorkspaceRepository;
 
 public class WorkspaceService {
@@ -21,14 +22,42 @@ public class WorkspaceService {
 
     private final WorkspaceRepository workspaceRepository;
     private final BookingRepository bookingRepository;
+    private final AccessPolicy accessPolicy;
 
-    public WorkspaceService(WorkspaceRepository workspaceRepository, BookingRepository bookingRepository) {
+    public WorkspaceService(WorkspaceRepository workspaceRepository, BookingRepository bookingRepository,
+                            EmployeeRepository employeeRepository) {
         this.workspaceRepository = workspaceRepository;
         this.bookingRepository = bookingRepository;
+        this.accessPolicy = new AccessPolicy(employeeRepository);
+    }
+
+    public Workspace createAs(long actorId, WorkspaceType type, String code, int floor, boolean hasMonitor,
+                              Integer capacity) {
+        accessPolicy.requireManager(actorId, "добавлять рабочие места");
+        return create(type, code, floor, hasMonitor, capacity);
+    }
+
+    public Workspace updateAs(long actorId, long id, String code, int floor, boolean hasMonitor) {
+        accessPolicy.requireManager(actorId, "изменять рабочие места");
+        return update(id, code, floor, hasMonitor);
+    }
+
+    public Workspace changeStatusAs(long actorId, long id, WorkspaceStatus newStatus) {
+        accessPolicy.requireManager(actorId, "менять статус рабочих мест");
+        return changeStatus(id, newStatus);
+    }
+
+    public void deleteAs(long actorId, long id) {
+        accessPolicy.requireManager(actorId, "удалять рабочие места");
+        delete(id);
     }
 
     public List<Workspace> findAll() {
         return workspaceRepository.findAll();
+    }
+
+    public List<Workspace> findAvailableForBooking() {
+        return workspaceRepository.findAll().stream().filter(Workspace::isAvailable).toList();
     }
 
     public Workspace findById(long id) {

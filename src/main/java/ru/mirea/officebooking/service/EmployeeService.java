@@ -3,6 +3,7 @@ package ru.mirea.officebooking.service;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import ru.mirea.officebooking.exception.AccessDeniedException;
 import ru.mirea.officebooking.exception.EntityNotFoundException;
 import ru.mirea.officebooking.exception.ValidationException;
 import ru.mirea.officebooking.model.Employee;
@@ -17,14 +18,58 @@ public class EmployeeService {
 
     private final EmployeeRepository employeeRepository;
     private final BookingRepository bookingRepository;
+    private final AccessPolicy accessPolicy;
 
     public EmployeeService(EmployeeRepository employeeRepository, BookingRepository bookingRepository) {
         this.employeeRepository = employeeRepository;
         this.bookingRepository = bookingRepository;
+        this.accessPolicy = new AccessPolicy(employeeRepository);
+    }
+
+    public Employee login(String email) {
+        String normalized = Employee.normalizeEmail(email);
+        Employee employee = employeeRepository.findByEmail(normalized)
+                .orElseThrow(() -> new AccessDeniedException("Сотрудник с email " + normalized + " не найден"));
+        if (employee.isBlocked()) {
+            throw new AccessDeniedException("Сотрудник %s заблокирован, вход запрещён".formatted(employee.getFullName()));
+        }
+        return employee;
+    }
+
+    public Employee createAs(long actorId, String fullName, String email, String department, String position,
+                             LocalDate hireDate, EmployeeRole role) {
+        accessPolicy.requireManager(actorId, "добавлять сотрудников");
+        return create(fullName, email, department, position, hireDate, role);
+    }
+
+    public Employee updateAs(long actorId, long id, String fullName, String email, String department, String position,
+                             LocalDate hireDate, EmployeeRole role) {
+        accessPolicy.requireManager(actorId, "изменять данные сотрудников");
+        return update(id, fullName, email, department, position, hireDate, role);
+    }
+
+    public Employee setBlockedAs(long actorId, long id, boolean blocked) {
+        accessPolicy.requireManager(actorId, "блокировать сотрудников");
+        if (actorId == id) {
+            throw new ValidationException("Нельзя заблокировать самого себя");
+        }
+        return setBlocked(id, blocked);
+    }
+
+    public void deleteAs(long actorId, long id) {
+        accessPolicy.requireManager(actorId, "удалять сотрудников");
+        if (actorId == id) {
+            throw new ValidationException("Нельзя удалить самого себя");
+        }
+        delete(id);
     }
 
     public List<Employee> findAll() {
         return employeeRepository.findAll();
+    }
+
+    public List<Employee> findAvailableForBooking() {
+        return employeeRepository.findAll().stream().filter(e -> !e.isBlocked()).toList();
     }
 
     public Employee findById(long id) {

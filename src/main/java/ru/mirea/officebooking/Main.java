@@ -2,10 +2,8 @@ package ru.mirea.officebooking;
 
 import java.util.List;
 import java.util.Scanner;
-import org.flywaydb.core.Flyway;
-import org.flywaydb.core.api.FlywayException;
 import ru.mirea.officebooking.exception.AppException;
-import ru.mirea.officebooking.exception.DatabaseException;
+import ru.mirea.officebooking.repository.BookingQueryRepository;
 import ru.mirea.officebooking.repository.BookingRepository;
 import ru.mirea.officebooking.repository.EmployeeRepository;
 import ru.mirea.officebooking.repository.TableDumpRepository;
@@ -30,6 +28,7 @@ import ru.mirea.officebooking.ui.StatisticsMenu;
 import ru.mirea.officebooking.ui.WorkspaceMenu;
 import ru.mirea.officebooking.util.CsvExporter;
 import ru.mirea.officebooking.util.DatabaseManager;
+import ru.mirea.officebooking.util.DatabaseMigrator;
 import ru.mirea.officebooking.util.ExcelExporter;
 
 public final class Main {
@@ -51,19 +50,21 @@ public final class Main {
 
     private static void start() {
         DatabaseManager databaseManager = new DatabaseManager();
-        runMigrations(databaseManager);
+        DatabaseMigrator.migrate(databaseManager);
 
         EmployeeRepository employeeRepository = new EmployeeRepository(databaseManager);
         WorkspaceRepository workspaceRepository = new WorkspaceRepository(databaseManager);
         BookingRepository bookingRepository = new BookingRepository(databaseManager);
+        BookingQueryRepository bookingQueryRepository = new BookingQueryRepository(databaseManager);
         TableDumpRepository tableDumpRepository = new TableDumpRepository(databaseManager);
 
         EmployeeService employeeService = new EmployeeService(employeeRepository, bookingRepository);
-        WorkspaceService workspaceService = new WorkspaceService(workspaceRepository, bookingRepository);
+        WorkspaceService workspaceService =
+                new WorkspaceService(workspaceRepository, bookingRepository, employeeRepository);
         BookingService bookingService = new BookingService(bookingRepository, employeeRepository, workspaceRepository);
         BookingSearchService searchService = new BookingSearchService(bookingRepository);
         StatisticsService statisticsService =
-                new StatisticsService(employeeRepository, workspaceRepository, bookingRepository);
+                new StatisticsService(employeeRepository, workspaceRepository, bookingRepository, bookingQueryRepository);
         ExportService exportService = new ExportService(employeeRepository, workspaceRepository, bookingRepository,
                 List.of(new ExcelExporter(), new CsvExporter()));
         DbTablesService dbTablesService = new DbTablesService(tableDumpRepository);
@@ -82,16 +83,5 @@ public final class Main {
                 new ExportMenu(exportService, reader),
                 new DbTablesMenu(dbTablesService, reader));
         app.run();
-    }
-
-    private static void runMigrations(DatabaseManager databaseManager) {
-        try {
-            Flyway flyway = Flyway.configure()
-                    .dataSource(databaseManager.getUrl(), databaseManager.getUser(), databaseManager.getPassword())
-                    .load();
-            flyway.migrate();
-        } catch (FlywayException e) {
-            throw new DatabaseException("Не удалось применить миграции базы данных", e);
-        }
     }
 }
