@@ -39,4 +39,5 @@ dependency-reduced-pom.xml
 .env
 
 # проектная документация — не в репозитории
-docs/
+docs/*
+!docs/10-practice-tasks.md
