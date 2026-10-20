@@ -242,3 +242,162 @@ public static String of(Throwable t);
 
 ---
 
+## 3. Frontend: экраны, `fx:id`, обработчики
+
+Фронт держим максимально простым: один `TabPane`, на вкладках таблицы.
+
+### F1. Каркас
+- `OfficeBookingFxApplication extends Application`: `start(Stage)` → создаёт `AppContext` → грузит `fxml/main.fxml` через `FXMLLoader`, `controllerFactory` передаёт `AppContext` в контроллер → `Scene` + `app.css` → `stage.setTitle(...)`, `stage.show()`.
+- Объяснение для защиты: **Stage** — окно, **Scene** — содержимое окна, **Node** — любой элемент дерева (Button, TableView, VBox).
+
+### F2. `main.fxml` + `MainController` — вкладка «Брони»
+
+| Элемент | fx:id / onAction | Связь с backend |
+|---|---|---|
+| Поле поиска | `searchField` (слушатель текста с задержкой ~300 мс) | `BookingFilter.text` |
+| Фильтр «Статус» | `statusCombo` (Все + значения enum) | `BookingFilter.status` |
+| Фильтр «Тип места» | `typeCombo` | `.workspaceType` |
+| Фильтр «Этаж» | `floorCombo` (Все + этажи из данных) | `.floor` |
+| Период | `dateFromPicker`, `dateToPicker` (`DatePicker`) | `.dateFrom/.dateTo` |
+| Сортировка | `sortCombo` + `ascToggle`; также клик по заголовку столбца | `BookingSort`, `ascending` |
+| Кнопка «Сбросить» | `onReset` | `BookingFilter.empty()` |
+| Кнопка «Обновить» | `onRefresh` | `search(...)` |
+| Таблица | `bookingTable` (`TableView<BookingRow>`), колонки: №, Сотрудник, Место, Тип, Этаж, Начало, Конец, Статус, Участников, Цель | `ObservableList<BookingRow>` |
+| Кнопки | `onAdd`, `onEdit`, `onDelete`, `onCancelBooking`, `onComplete`, `onNoShow`, `onExport` | `BookingService.*`, `ExportService.exportRows` |
+| Статус-строка | `statusLabel` («Найдено: N») | — |
+
+Поведение:
+- Любое изменение фильтра/поиска/сортировки → `reload()` → `AsyncRunner.run(() -> queries.search(...), items::setAll, showError)`.
+- Кнопки `Edit/Delete/статусы` отключены (`disableProperty` через binding к `selectionModel.selectedItemProperty().isNull()`).
+- После add/edit/delete/смены статуса — `reload()` и выделение изменённой строки (по id).
+- `onDelete`: `Alert(CONFIRMATION)` «Удалить бронь #id (сотрудник, место, время)?» → только по OK `bookings.delete(id)`.
+- `onExport`: `FileChooser` с фильтрами `*.xlsx`, `*.csv`, имя по умолчанию `bookings.xlsx`; путь не прописан в коде.
+- Сортировка: сортируем на стороне БД (`ORDER BY`), поэтому у столбцов `TableColumn.setSortable(false)`, а заголовок-клик вызывает `reload()` с нужным `BookingSort`. (Альтернатива — `SortedList` в памяти: проще, но тогда на защите объяснять, что сортируем в Java; выбираем **SQL** — единообразнее и быстрее на больших данных.)
+
+### F3. `booking-dialog.fxml` + `BookingDialogController` — добавление/редактирование
+Один диалог на два режима (`Mode.CREATE` / `Mode.EDIT`).
+
+| Поле | Элемент | Валидация до вызова сервиса |
+|---|---|---|
+| Сотрудник | `employeeCombo` (`ComboBox<Employee>`) | не пусто; при EDIT — `disable` |
+| Место | `workspaceCombo` (`ComboBox<Workspace>`) | не пусто; при EDIT — `disable` |
+| Дата | `datePicker` | не пусто |
+| Начало | `startHourCombo` (08…21) | не пусто |
+| Длительность/конец | `endHourCombo` (09…22, > начала) | конец > начала |
+| Участников | `attendeesField` | пусто или целое 1…1000; для переговорной обязательно |
+| Цель | `purposeArea` | ≤ 255 символов |
+| Ошибка | `errorLabel` (красный, CSS-класс `error`) | показываем первое найденное нарушение |
+
+- Кнопка «Сохранить» вызывает `create`/`updateTime`; при исключении диалог **не закрывается**, текст ошибки в `errorLabel`.
+- Часы выбираем из списков, а не вводим вручную (правило «шаг 1 час, 08–22» нарушить нельзя).
+- В EDIT поля заполняются из выбранного `BookingRow`.
+
+### F4. Вкладка «Сотрудники» (`employees.fxml`, `EmployeesController`)
+- `TableView<Employee>`: ФИО, Email, Отдел, Должность, Дата приёма, Роль, Заблокирован.
+- Кнопки: Добавить / Изменить / Удалить (с подтверждением) / Блокировать-разблокировать → `EmployeeService.create/update/delete/setBlocked`.
+- Поиск по ФИО/email — фильтр в памяти (`FilteredList`), набор малый.
+- Ошибка удаления сотрудника, у которого есть брони (`ON DELETE RESTRICT`), уже даёт понятный текст из сервиса.
+
+### F5. Вкладка «Рабочие места» (`workspaces.fxml`, `WorkspacesController`)
+- `TableView<Workspace>`: Код, Этаж, Тип, Статус, Монитор, Вместимость.
+- Кнопки: Добавить / Изменить (код, этаж, монитор) / Сменить статус / Удалить → `WorkspaceService.*`.
+- Вместимость вводится только для `MEETING_ROOM` (поле активируется по выбранному типу).
+
+### F6. Вкладка «Статистика» (`statistics.fxml`, `StatisticsController`)
+- Период: `fromPicker`, `toPicker`, кнопка «Рассчитать» → `statistics.buildReport(from, to)`.
+- Плитки (Label): всего броней, в периоде, % неявок, средняя/мин/макс длительность.
+- Таблицы/простые диаграммы (`PieChart` по статусам, `BarChart`/`TableView` по типам и топам).
+- Загрузка через `AsyncRunner`.
+
+### F7. `app.css`
+Стили для: `.root`, `.button` / `.button-primary` / `.button-danger`, `.table-view`, `.text-field`/`.combo-box`, `.title-label`, `.error` (красный текст), `.tile` (карточки статистики). Подключается к `Scene`, а не прописывается в коде элементов.
+
+---
+
+## 4. Валидация (сводка по заданию)
+
+| Что проверяем | Где | Как |
+|---|---|---|
+| Пустые обязательные поля | Контроллер диалога | Перед вызовом сервиса, `errorLabel` с названием поля |
+| Числа и диапазоны | Контроллер → `Booking.validateAttendees` | Парсинг `Integer`, 1…1000 |
+| Даты и их логика | Контроллер + `BookingService.validateInterval` | Конец > начала, горизонт 30 дней, не в прошлом, 08:00–22:00 |
+| Длина строк | `Validation.optionalText` | Цель ≤ 255, ФИО/email — в моделях |
+| Уникальность | БД (`UNIQUE`) + `SqlExceptionTranslator` | email сотрудника, код места → понятное сообщение |
+| Ссылки на связанные сущности | `ComboBox` + `EntityNotFoundException` | Нельзя ввести несуществующий id |
+| Бизнес-ограничения | `BookingService`/`Workspace.validateBooking` | Конфликты, заблокирован, место недоступно, вместимость |
+
+Принцип: **UI проверяет форму (тип, пусто), сервис/модель — смысл.** Одно правило в одном месте.
+
+---
+
+## 5. Тесты (пишем новые)
+
+Все без запуска JavaFX. Для сервисов — либо тестовая БД (`office_booking_test`), либо подмена репозиториев. Рекомендую **тестовую БД** (быстро проверить SQL).
+
+| Тест | Что проверяет |
+|---|---|
+| `BookingFilterTest` | `dateFrom > dateTo` → `ValidationException`; `empty()` ничего не фильтрует |
+| `BookingQueryRepositoryTest` | поиск по ФИО/email/коду/цели; каждый фильтр отдельно и вместе; период пересекающихся броней; все `BookingSort` в обе стороны; `%`/`_` в тексте не ломают запрос |
+| `BookingQueryServiceTest` | `getRow` несуществующего → `EntityNotFoundException`; `null` аргументы |
+| `StatisticsServiceTest` | пустая БД → нули без `NaN`; процент неявок; период |
+| `CsvBookingExporterTest`, `XlsxBookingExporterTest` | файл создаётся во `@TempDir`, число строк = входных, заголовки, кавычки/`;` в цели |
+| `ExportServiceTest` | `.txt` → `ValidationException`; выбор экспортёра по расширению |
+| `ErrorMessagesTest` | `AppException` → его текст; `RuntimeException` → общий текст без stack trace |
+| Правила моделей | вернуть `ModelRulesTest`, `BookingServiceTest` из КР 1 (в git они помечены удалёнными — решить, восстанавливать ли) |
+
+---
+
+## 6. Порядок работы (маленькие задания)
+
+**Бэкенд (делаете вы, я подсказываю)**
+1. B0 — `DatabaseMigrator` + `AppContext` (заодно проверка, что подключение работает).
+2. B1 — DTO `BookingRow`, `BookingFilter`, `BookingSort` + `BookingFilterTest`.
+3. B2 — `BookingQueryRepository.search` + `BookingQueryService` + тесты. **Самый важный шаг.**
+4. B4 — два метода для ComboBox.
+5. B5 — `StatisticsReport` + `buildReport` + тесты.
+6. B6 — экспортёры строк + `ExportService.exportRows` + тесты.
+7. B7/B8 — `AsyncRunner`, `ErrorMessages` + тест.
+
+**Фронт (минимум вникания, делаем по шаблону)**
+8. F1 + `app.css` — пустое окно запускается (`mvn javafx:run`).
+9. F2 — таблица и загрузка (после шага 3).
+10. F2 — поиск, фильтры, сортировка.
+11. F3 — диалог брони; удаление с подтверждением; статусы.
+12. F6 — статистика (после шага 5).
+13. F2 `onExport` (после шага 6).
+14. F4, F5 — вкладки сотрудников и мест.
+15. Прогон чек-листа ниже, проверка слоёв grep'ом.
+
+---
+
+## 7. Чек-лист «обязательный минимум» из задания
+
+- [ ] Запуск без ошибок (`mvn javafx:run`)
+- [ ] БД и предметная область из КР 1
+- [ ] Основная сущность в `TableView`
+- [ ] Добавление / редактирование / удаление, подтверждение удаления
+- [ ] Просмотр связанных данных (ФИО и код места в строке брони)
+- [ ] Поиск (≥ 3 поля), фильтры (≥ 2), сортировка (≥ 2)
+- [ ] Валидация, понятные сообщения, без stack trace
+- [ ] FXML + CSS
+- [ ] Разделение Controller / Service / DAO
+- [ ] ≥ 5 показателей статистики
+- [ ] Экспорт `.xlsx`/`.csv` через `FileChooser`
+- [ ] Нет пустых обработчиков и пустых `catch`
+- [ ] Нет жёстких путей и пароля БД в коде
+
+## 8. Вопросы защиты → где ответ
+
+| Вопрос | Ответ |
+|---|---|
+| Как запускается приложение | `Application.start` → `AppContext` → `FXMLLoader` → `Scene` → `Stage` |
+| Зачем FXML | Разметка отдельно от логики; связь с контроллером через `fx:controller`, `@FXML` поля по `fx:id`, `onAction` |
+| Как обновляется `TableView` | Данные в `ObservableList`; `setAll` после загрузки, таблица перерисовывается сама |
+| Зачем `ObservableList` | Уведомляет таблицу об изменениях |
+| Где бизнес-логика | `model` + `service` |
+| Где работа с данными | `repository` (JDBC, `PreparedStatement`) |
+| Как обрабатываются исключения | Репозиторий → `DatabaseException`; сервис → `AppException`-наследники; контроллер → `ErrorMessages` + `Alert`/`errorLabel` |
+| Поиск/фильтры | `BookingFilter` → динамический `WHERE` с параметрами |
+| Статистика | `StatisticsService.buildReport`, агрегаты `GROUP BY` |
+| Экспорт | `BookingRowExporter` по расширению файла из `FileChooser` |
+| Почему не в потоке FX | `Task` в `AsyncRunner`, иначе интерфейс замирает на время запроса |
