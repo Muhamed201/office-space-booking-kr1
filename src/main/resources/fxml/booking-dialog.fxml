@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.DatePicker?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="ru.mirea.officebooking.fx.controller.BookingDialogController"
+      styleClass="form" spacing="12" prefWidth="480">
+    <GridPane hgap="10" vgap="10">
+        <columnConstraints>
+            <ColumnConstraints minWidth="110"/>
+            <ColumnConstraints hgrow="ALWAYS"/>
+        </columnConstraints>
+
+        <Label text="Сотрудник *" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
+        <ComboBox fx:id="employeeCombo" maxWidth="Infinity" GridPane.rowIndex="0" GridPane.columnIndex="1"/>
+
+        <Label text="Место *" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
+        <ComboBox fx:id="workspaceCombo" maxWidth="Infinity" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+
+        <Label text="Дата *" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
+        <DatePicker fx:id="datePicker" maxWidth="Infinity" GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+
+        <Label text="Время *" GridPane.rowIndex="3" GridPane.columnIndex="0"/>
+        <HBox spacing="8" GridPane.rowIndex="3" GridPane.columnIndex="1">
+            <ComboBox fx:id="startHourCombo" prefWidth="100"/>
+            <Label text="—"/>
+            <ComboBox fx:id="endHourCombo" prefWidth="100"/>
+        </HBox>
+
+        <Label text="Участников" GridPane.rowIndex="4" GridPane.columnIndex="0"/>
+        <TextField fx:id="attendeesField" promptText="Обязательно для переговорной" GridPane.rowIndex="4" GridPane.columnIndex="1"/>
+
+        <Label text="Цель" GridPane.rowIndex="5" GridPane.columnIndex="0"/>
+        <TextArea fx:id="purposeArea" prefRowCount="3" wrapText="true" GridPane.rowIndex="5" GridPane.columnIndex="1"/>
+    </GridPane>
+    <Label fx:id="errorLabel" styleClass="error" wrapText="true" prefWidth="440">
+        <padding>
+            <Insets top="2"/>
+        </padding>
+    </Label>
+</VBox>
