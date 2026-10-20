@@ -76,7 +76,7 @@ public class CsvExporter implements Exporter {
         }
     }
 
-    private static String escape(String value) {
+    static String escape(String value) {
         String safe = value;
         if (Stream.of("=", "+", "-", "@").anyMatch(safe::startsWith) && !isNumber(safe)) {
             safe = "'" + safe;

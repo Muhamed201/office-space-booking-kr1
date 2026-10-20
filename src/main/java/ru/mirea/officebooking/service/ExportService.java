@@ -1,11 +1,17 @@
 package ru.mirea.officebooking.service;
 
+import java.nio.file.Path;
 import java.util.List;
+import ru.mirea.officebooking.dto.BookingRow;
+import ru.mirea.officebooking.exception.ValidationException;
 import ru.mirea.officebooking.model.Validation;
 import ru.mirea.officebooking.repository.BookingRepository;
 import ru.mirea.officebooking.repository.EmployeeRepository;
 import ru.mirea.officebooking.repository.WorkspaceRepository;
+import ru.mirea.officebooking.util.BookingRowExporter;
+import ru.mirea.officebooking.util.CsvBookingExporter;
 import ru.mirea.officebooking.util.Exporter;
+import ru.mirea.officebooking.util.XlsxBookingExporter;
 
 public class ExportService {
 
@@ -13,6 +19,7 @@ public class ExportService {
     private final WorkspaceRepository workspaceRepository;
     private final BookingRepository bookingRepository;
     private final List<Exporter> exporters;
+    private final List<BookingRowExporter> rowExporters = List.of(new XlsxBookingExporter(), new CsvBookingExporter());
 
     public ExportService(EmployeeRepository employeeRepository, WorkspaceRepository workspaceRepository,
                          BookingRepository bookingRepository, List<Exporter> exporters) {
@@ -29,5 +36,16 @@ public class ExportService {
     public String export(Exporter exporter) {
         Validation.requireNotNull(exporter, "Формат экспорта");
         return exporter.export(employeeRepository.findAll(), workspaceRepository.findAll(), bookingRepository.findAll());
+    }
+
+    public void exportRows(List<BookingRow> rows, Path target) {
+        Validation.requireNotNull(rows, "Данные для экспорта");
+        Validation.requireNotNull(target, "Путь сохранения файла");
+        String fileName = target.getFileName().toString().toLowerCase();
+        BookingRowExporter exporter = rowExporters.stream()
+                .filter(e -> fileName.endsWith("." + e.extension()))
+                .findFirst()
+                .orElseThrow(() -> new ValidationException("Поддерживаются только файлы .xlsx и .csv"));
+        exporter.export(rows, target);
     }
 }
