@@ -2,6 +2,7 @@ package ru.mirea.officebooking.repository;
 
 import java.sql.SQLException;
 import ru.mirea.officebooking.exception.AppException;
+import ru.mirea.officebooking.exception.BookingConflictException;
 import ru.mirea.officebooking.exception.DatabaseException;
 import ru.mirea.officebooking.exception.ValidationException;
 
@@ -11,6 +12,7 @@ final class SqlExceptionTranslator {
     private static final String FOREIGN_KEY_VIOLATION = "23503";
     private static final String NOT_NULL_VIOLATION = "23502";
     private static final String CHECK_VIOLATION = "23514";
+    private static final String EXCLUSION_VIOLATION = "23P01";
     private static final String CONNECTION_CLASS = "08";
 
     private SqlExceptionTranslator() {
@@ -33,6 +35,12 @@ final class SqlExceptionTranslator {
                 return new ValidationException(action + ": на эту запись ссылаются другие данные (например, брони)");
             }
             return new ValidationException(action + ": указана несуществующая связанная запись");
+        }
+        if (EXCLUSION_VIOLATION.equals(state)) {
+            if (details.contains("booking_employee_no_overlap")) {
+                return new BookingConflictException(action + ": у сотрудника уже есть активная бронь на это время");
+            }
+            return new BookingConflictException(action + ": рабочее место уже занято на это время");
         }
         if (NOT_NULL_VIOLATION.equals(state)) {
             return new ValidationException(action + ": не заполнено обязательное поле");

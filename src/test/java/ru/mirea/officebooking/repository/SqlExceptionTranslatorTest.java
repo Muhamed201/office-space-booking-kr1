@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.sql.SQLException;
 import org.junit.jupiter.api.Test;
 import ru.mirea.officebooking.exception.AppException;
+import ru.mirea.officebooking.exception.BookingConflictException;
 import ru.mirea.officebooking.exception.DatabaseException;
 import ru.mirea.officebooking.exception.ValidationException;
 
@@ -45,6 +46,18 @@ class SqlExceptionTranslatorTest {
     void notNullAndCheckViolationsBecomeValidationErrors() {
         assertInstanceOf(ValidationException.class, translate("23502", "null value in column"));
         assertInstanceOf(ValidationException.class, translate("23514", "violates check constraint"));
+    }
+
+    @Test
+    void overlapConstraintsBecomeBookingConflicts() {
+        AppException workspace = translate("23P01",
+                "conflicting key value violates exclusion constraint \"booking_workspace_no_overlap\"");
+        AppException employee = translate("23P01",
+                "conflicting key value violates exclusion constraint \"booking_employee_no_overlap\"");
+        assertInstanceOf(BookingConflictException.class, workspace);
+        assertInstanceOf(BookingConflictException.class, employee);
+        assertTrue(workspace.getMessage().contains("место"));
+        assertTrue(employee.getMessage().contains("сотрудника"));
     }
 
     @Test
