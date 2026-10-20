@@ -41,3 +41,4 @@ dependency-reduced-pom.xml
 # проектная документация — не в репозитории
 docs/*
 !docs/10-practice-tasks.md
+!docs/12-kr2-spec.md
