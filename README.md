@@ -84,13 +84,26 @@ java -jar target/office-booking.jar
 
 Для разработки удобно поднять БД в Docker и запускать `Main` из IDE.
 
+### Вариант C — JavaFX-клиент (КР 2)
+
+```bash
+docker compose up -d db
+./mvnw javafx:run
+```
+
+Графический клиент подключается к той же БД напрямую по JDBC (параметры — `database.properties`).
+Вход по email сотрудника: `orlova@company.ru` — офис-менеджер (все права), `ivanov@company.ru` —
+обычный сотрудник (только свои брони).
+Тесты репозитория с БД включаются переменной `TEST_DB_URL` (отдельная база, например
+`jdbc:postgresql://localhost:5434/office_booking_test`), без неё они пропускаются.
+
 ### Настройки подключения
 
-По умолчанию берутся из `src/main/resources/application.properties`:
+По умолчанию берутся из `src/main/resources/database.properties`:
 `localhost:5434`, база `office_booking`, пользователь и пароль `office`.
 Переменные окружения `DB_URL`, `DB_USER`, `DB_PASSWORD` важнее файла (так работает контейнер `app`,
 для которого хост базы — `db`). Чтобы сменить порт базы, поменяйте `DB_PORT` в `.env` и `db.url` в
-`application.properties`.
+`database.properties`.
 
 Схема и демо-данные (6 сотрудников, 12 мест, 14 броней) применяются автоматически при старте
 приложения. Вручную: `./mvnw flyway:migrate`.
