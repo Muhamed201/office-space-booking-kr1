@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import ru.mirea.officebooking.exception.AccessDeniedException;
 import ru.mirea.officebooking.exception.BookingConflictException;
 import ru.mirea.officebooking.exception.EntityNotFoundException;
 import ru.mirea.officebooking.exception.InvalidStatusTransitionException;
@@ -48,6 +49,8 @@ class BookingServiceTest {
         employees.put(1L, employee(1L, "Иванов Иван Иванович", false));
         employees.put(2L, employee(2L, "Петрова Мария Сергеевна", false));
         employees.put(3L, employee(3L, "Сидоров Алексей Викторович", true));
+        employees.put(4L, new Employee(4L, "Орлова Анна Викторовна", "orlova@company.ru", "Администрация", null,
+                LocalDate.of(2020, 1, 15), false, EmployeeRole.OFFICE_MANAGER));
 
         Map<Long, Workspace> workspaces = new HashMap<>();
         workspaces.put(1L, new OpenDesk(1L, "A-01", 2, WorkspaceStatus.AVAILABLE, true));
@@ -292,6 +295,64 @@ class BookingServiceTest {
         service.delete(created.getId());
         assertThrows(EntityNotFoundException.class, () -> service.findById(created.getId()));
         assertThrows(EntityNotFoundException.class, () -> service.delete(created.getId()));
+    }
+
+    @Test
+    void employeeCanBookOnlyForHimself() {
+        assertDoesNotThrow(() -> service.createAs(1L, 1L, 1L, TOMORROW_9, TOMORROW_9.withHour(10), null, null));
+        assertThrows(AccessDeniedException.class,
+                () -> service.createAs(1L, 2L, 5L, TOMORROW_9, TOMORROW_9.withHour(10), null, null));
+    }
+
+    @Test
+    void managerCanBookForAnotherEmployee() {
+        Booking created = service.createAs(4L, 2L, 1L, TOMORROW_9, TOMORROW_9.withHour(10), null, null);
+        assertEquals(2L, created.getEmployeeId());
+    }
+
+    @Test
+    void ownerCanCancelOwnBooking() {
+        Booking created = createDesk(1L, 10, 12);
+        assertEquals(BookingStatus.CANCELLED,
+                service.changeStatusAs(1L, created.getId(), BookingStatus.CANCELLED).getStatus());
+    }
+
+    @Test
+    void employeeCannotCancelOrEditForeignBooking() {
+        Booking foreign = createDesk(2L, 10, 12);
+        assertThrows(AccessDeniedException.class,
+                () -> service.changeStatusAs(1L, foreign.getId(), BookingStatus.CANCELLED));
+        assertThrows(AccessDeniedException.class,
+                () -> service.updateTimeAs(1L, foreign.getId(), TOMORROW_9.withHour(13), TOMORROW_9.withHour(14),
+                        null, null));
+        assertEquals(BookingStatus.ACTIVE, service.findById(foreign.getId()).getStatus());
+    }
+
+    @Test
+    void managerCanCancelForeignBooking() {
+        Booking foreign = createDesk(2L, 10, 12);
+        assertEquals(BookingStatus.CANCELLED,
+                service.changeStatusAs(4L, foreign.getId(), BookingStatus.CANCELLED).getStatus());
+    }
+
+    @Test
+    void onlyManagerMarksNoShowAndDeletes() {
+        Booking started = bookings.seed(1L, 1L, NOW.minusHours(1), NOW.plusHours(1));
+        assertThrows(AccessDeniedException.class,
+                () -> service.changeStatusAs(1L, started.getId(), BookingStatus.NO_SHOW));
+        assertThrows(AccessDeniedException.class, () -> service.deleteAs(1L, started.getId()));
+        assertEquals(BookingStatus.NO_SHOW,
+                service.changeStatusAs(4L, started.getId(), BookingStatus.NO_SHOW).getStatus());
+        assertDoesNotThrow(() -> service.deleteAs(4L, started.getId()));
+    }
+
+    @Test
+    void blockedOrUnknownActorIsRejected() {
+        Booking created = createDesk(1L, 10, 12);
+        assertThrows(AccessDeniedException.class,
+                () -> service.changeStatusAs(3L, created.getId(), BookingStatus.CANCELLED));
+        assertThrows(AccessDeniedException.class,
+                () -> service.changeStatusAs(99L, created.getId(), BookingStatus.CANCELLED));
     }
 
     private static final class FakeEmployees extends EmployeeRepository {
