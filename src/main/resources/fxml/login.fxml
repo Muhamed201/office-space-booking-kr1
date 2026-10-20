@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="ru.mirea.officebooking.fx.controller.LoginController"
+      styleClass="form" spacing="10" prefWidth="380">
+    <Label text="Вход в систему" styleClass="title-label"/>
+    <Label text="Email сотрудника *"/>
+    <TextField fx:id="emailField" promptText="например, ivanov@company.ru"/>
+    <Label text="Права зависят от роли: сотрудник управляет своими бронями, офис-менеджер — всеми данными."
+           styleClass="field-label" wrapText="true" prefWidth="360"/>
+    <Label fx:id="errorLabel" styleClass="error" wrapText="true" prefWidth="360"/>
+</VBox>
