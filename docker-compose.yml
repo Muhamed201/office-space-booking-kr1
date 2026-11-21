@@ -1,39 +1,52 @@
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     container_name: office-booking-db
     environment:
-      POSTGRES_DB: ${DB_NAME:-office_booking}
-      POSTGRES_USER: ${DB_USER:-office}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-office}
+      POSTGRES_DB: ${POSTGRES_DB:-office_booking}
+      POSTGRES_USER: ${POSTGRES_USER:-office}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-55432}:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-office} -d ${DB_NAME:-office_booking}"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 5s
       timeout: 5s
       retries: 10
 
-  # Консольное приложение. Не поднимается вместе с `up` (профиль "app"),
-  # т.к. интерактивное меню в мультиплексе логов compose нечитаемо.
-  # Запуск: docker compose run --rm app
-  app:
+  backend:
     build: .
-    image: office-booking-app
-    profiles: ["app"]
+    container_name: office-booking-backend
     depends_on:
       db:
         condition: service_healthy
     environment:
-      DB_URL: jdbc:postgresql://db:5432/${DB_NAME:-office_booking}
-      DB_USER: ${DB_USER:-office}
-      DB_PASSWORD: ${DB_PASSWORD:-office}
-    volumes:
-      - ./exports:/app/exports
-    stdin_open: true
-    tty: true
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-office_booking}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-office}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      JWT_SECRET_BASE64: ${JWT_SECRET_BASE64:?Set JWT_SECRET_BASE64 in .env}
+      JWT_ISSUER: ${JWT_ISSUER:-office-booking}
+      ACCESS_TOKEN_MINUTES: ${ACCESS_TOKEN_MINUTES:-15}
+      REFRESH_TOKEN_DAYS: ${REFRESH_TOKEN_DAYS:-14}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@example.org}
+      BOOTSTRAP_ADMIN_NAME: ${BOOTSTRAP_ADMIN_NAME:-System Administrator}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      PERMANENT_DELETE_ENABLED: ${PERMANENT_DELETE_ENABLED:-false}
+      MAX_LOGIN_ATTEMPTS: ${MAX_LOGIN_ATTEMPTS:-5}
+      LOCKOUT_MINUTES: ${LOCKOUT_MINUTES:-15}
+      APP_PORT: 8080
+      TZ: Europe/Moscow
+    ports:
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
 volumes:
   db-data:

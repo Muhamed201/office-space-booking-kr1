@@ -8,4 +8,6 @@ docs
 sql
 *.md
 .env
+frontend
+exports
 .mvn/wrapper/maven-wrapper.jar

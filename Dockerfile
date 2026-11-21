@@ -1,13 +1,14 @@
-# ---- сборка ----
-FROM maven:3.9-eclipse-temurin-21 AS build
-WORKDIR /build
-COPY pom.xml .
-RUN mvn -q -B dependency:go-offline
-COPY src ./src
-RUN mvn -q -B -DskipTests package
-
-# ---- запуск ----
-FROM eclipse-temurin:21-jre
+# Этап 1: Сборка Maven
+FROM maven:3.9-eclipse-temurin-21 AS builder
 WORKDIR /app
-COPY --from=build /build/target/office-booking.jar ./office-booking.jar
-ENTRYPOINT ["java", "-jar", "office-booking.jar"]
+COPY pom.xml .
+RUN mvn dependency:go-offline -B
+COPY src ./src
+RUN mvn clean package -DskipTests -B
+
+# Этап 2: Runtime образ с JRE
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+COPY --from=builder /app/target/*.jar app.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]
