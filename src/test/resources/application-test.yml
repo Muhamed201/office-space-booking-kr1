@@ -1,0 +1,18 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:office_booking;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+  flyway:
+    enabled: false
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+app:
+  jwt:
+    secret-base64: MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=
+  bootstrap:
+    email: admin@test.example
+    password: fixture-admin-password
+  security:
+    max-login-attempts: 3
